@@ -1,5 +1,5 @@
+import { put } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
     try {
@@ -10,33 +10,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, message: 'No file uploaded' }, { status: 400 });
         }
 
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        // Upload to Vercel Blob
+        const blob = await put(file.name, file, {
+            access: 'public',
+        });
 
-        // Create unique filename
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        const filename = `${uniqueSuffix}-${file.name.replace(/\s+/g, '-')}`;
-
-        // Upload to Supabase Storage
-        // NOTE: You must create a public bucket named 'uploads' in your Supabase dashboard
-        const { data: uploadData, error } = await supabase.storage
-            .from('uploads')
-            .upload(filename, buffer, {
-                contentType: file.type,
-                upsert: false
-            });
-
-        if (error) {
-            console.error('Supabase upload error:', error);
-            return NextResponse.json({ success: false, message: 'Upload to storage failed', error: error.message }, { status: 500 });
-        }
-
-        // Get Public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('uploads')
-            .getPublicUrl(filename);
-
-        return NextResponse.json({ success: true, url: publicUrl });
+        return NextResponse.json({ success: true, url: blob.url });
     } catch (error) {
         console.error('Upload error:', error);
         return NextResponse.json({
