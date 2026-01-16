@@ -1,0 +1,248 @@
+// E-commerce Management System - Prisma Schema (PostgreSQL Production)
+// Use this schema for production deployment with PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users Table
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      String   @default("Customer")
+  image     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  assignedOrders Order[]         @relation("AssignedToUser")
+  inventoryLogs  InventoryLog[]
+  addresses      Address[]
+  activityLogs   ActivityLog[]
+
+  @@map("users")
+}
+
+// Activity Logs Table
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String
+  details   String?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
+
+// User Addresses Table
+model Address {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  label       String?
+  firstName   String
+  lastName    String
+  phone       String
+  addressLine String   @map("address_line")
+  city        String
+  zipCode     String   @map("zip_code")
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+// Categories Table
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  products Product[]
+
+  @@map("categories")
+}
+
+// Products Table
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  price         Decimal  @db.Decimal(10, 2)
+  salePrice     Decimal? @map("sale_price") @db.Decimal(10, 2)
+  discountValue Decimal? @map("discount_value") @db.Decimal(10, 2)
+  discountType  String?  @default("PERCENT") @map("discount_type")
+  stock         Int      @default(0)
+  sku           String   @unique
+  isActive      Boolean  @default(true) @map("is_active")
+  isFeatured    Boolean  @default(false) @map("is_featured")
+  images        String   @default("[]")
+  categoryId    String   @map("category_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  category      Category       @relation(fields: [categoryId], references: [id])
+  tags          Tag[]          @relation("ProductTags")
+  orderItems    OrderItem[]
+  inventoryLogs InventoryLog[]
+
+  @@map("products")
+}
+
+// Tags Table
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  products  Product[] @relation("ProductTags")
+
+  @@map("tags")
+}
+
+// Customers Table
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  orders Order[]
+
+  @@map("customers")
+}
+
+// Order Statuses Table
+model OrderStatus {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  orderIndex Int      @unique @map("order_index")
+  color      String   @default("#000000")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  orders Order[]
+
+  @@map("order_statuses")
+}
+
+// Coupons Table
+model Coupon {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  discountType   String   @map("discount_type") // "PERCENT" or "FIXED"
+  discountValue  Decimal  @map("discount_value") @db.Decimal(10, 2)
+  minOrderAmount Decimal? @map("min_order_amount") @db.Decimal(10, 2)
+  maxDiscount    Decimal? @map("max_discount") @db.Decimal(10, 2)
+  usageLimit     Int?     @map("usage_limit")
+  usedCount      Int      @default(0) @map("used_count")
+  isActive       Boolean  @default(true) @map("is_active")
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("coupons")
+}
+
+// Orders Table
+model Order {
+  id              String   @id @default(uuid())
+  orderNumber     String   @unique @map("order_number")
+  customerId      String   @map("customer_id")
+  totalAmount     Decimal  @map("total_amount") @db.Decimal(10, 2)
+  statusId        String   @map("status_id")
+  paymentMethod   String   @map("payment_method")
+  paymentStatus   String   @default("Pending") @map("payment_status")
+  paymentRef      String?  @map("payment_ref")
+  assignedToId    String?  @map("assigned_to_id")
+  discountAmount  Decimal? @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  couponCode      String?  @map("coupon_code")
+  shippingAddress String?  @map("shipping_address")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  orderStatus OrderStatus @relation(fields: [statusId], references: [id])
+  assignedTo  User?       @relation("AssignedToUser", fields: [assignedToId], references: [id])
+  items       OrderItem[]
+
+  @@map("orders")
+}
+
+// Order Items Table
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  productId String   @map("product_id")
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  total     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// Inventory Logs Table
+model InventoryLog {
+  id          String   @id @default(uuid())
+  productId   String   @map("product_id")
+  userId      String   @map("user_id")
+  change      Int
+  reason      String
+  type        String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("inventory_logs")
+}
+
+// Payment Methods Table
+model PaymentMethod {
+  id        String   @id @default(uuid())
+  name      String
+  details   String?
+  type      String
+  qrCode    String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_methods")
+}
