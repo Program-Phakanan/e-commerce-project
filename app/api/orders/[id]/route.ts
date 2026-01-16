@@ -4,14 +4,15 @@ import { prisma } from '@/lib/prisma';
 // GET /api/orders/[id] - Get single order
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    props: { params: Promise<{ id: string }> }
 ) {
     try {
+        const params = await props.params;
         const order = await prisma.order.findUnique({
             where: { id: params.id },
             include: {
                 customer: true,
-                status: true,
+                orderStatus: true,
                 assignedTo: {
                     select: {
                         id: true,
@@ -19,14 +20,14 @@ export async function GET(
                         email: true,
                     },
                 },
-                orderItems: {
+                items: {
                     include: {
                         product: {
                             select: {
                                 id: true,
-                                productName: true,
+                                name: true,
                                 sku: true,
-                                imageUrls: true,
+                                images: true,
                             },
                         },
                     },
@@ -54,16 +55,17 @@ export async function GET(
 // PUT /api/orders/[id] - Update order
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    props: { params: Promise<{ id: string }> }
 ) {
     try {
+        const params = await props.params;
         const body = await request.json();
         const { statusId, paymentStatus, notes, assignedToId } = body;
 
         // Get current order status
         const currentOrder = await prisma.order.findUnique({
             where: { id: params.id },
-            include: { orderItems: true }
+            include: { items: true }
         });
 
         if (!currentOrder) {
@@ -73,7 +75,7 @@ export async function PUT(
         // Logic for Stock Deduction upon Payment Success
         if (paymentStatus === 'Paid' && currentOrder.paymentStatus !== 'Paid') {
             // 1. Check stock availability for all items
-            for (const item of currentOrder.orderItems) {
+            for (const item of currentOrder.items) {
                 const product = await prisma.product.findUnique({ where: { id: item.productId } });
                 if (!product || product.stock < item.quantity) {
                     return NextResponse.json(
@@ -87,7 +89,7 @@ export async function PUT(
             const adminUser = await prisma.user.findFirst({ where: { role: 'Admin' } }); // Use admin as actor for system auto-deduction
 
             // Use transaction for consistency if possible, but sequential is acceptable for MVP
-            for (const item of currentOrder.orderItems) {
+            for (const item of currentOrder.items) {
                 await prisma.product.update({
                     where: { id: item.productId },
                     data: { stock: { decrement: item.quantity } }
@@ -117,8 +119,8 @@ export async function PUT(
             },
             include: {
                 customer: true,
-                status: true,
-                orderItems: {
+                orderStatus: true,
+                items: {
                     include: {
                         product: true,
                     },
@@ -139,13 +141,14 @@ export async function PUT(
 // DELETE /api/orders/[id] - Cancel order
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    props: { params: Promise<{ id: string }> }
 ) {
     try {
+        const params = await props.params;
         const order = await prisma.order.findUnique({
             where: { id: params.id },
             include: {
-                orderItems: true,
+                items: true,
             },
         });
 
@@ -162,7 +165,7 @@ export async function DELETE(
                 where: { role: 'Admin' },
             });
 
-            for (const item of order.orderItems) {
+            for (const item of order.items) {
                 await prisma.product.update({
                     where: { id: item.productId },
                     data: {
