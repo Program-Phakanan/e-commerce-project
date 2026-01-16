@@ -17,7 +17,7 @@ export async function logActivity(
     try {
         let ipAddress = 'Unknown';
         if (request) {
-            ipAddress = request.headers.get('x-forwarded-for') || request.ip || 'Unknown';
+            ipAddress = request.headers.get('x-forwarded-for') || (request as any).ip || 'Unknown';
         }
 
         await prisma.activityLog.create({
