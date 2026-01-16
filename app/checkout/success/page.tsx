@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useEffect, useState, } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-export default function CheckoutSuccessPage() {
+function SuccessContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const sessionId = searchParams.get('session_id');
@@ -75,5 +75,17 @@ export default function CheckoutSuccessPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function CheckoutSuccessPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+        }>
+            <SuccessContent />
+        </Suspense>
     );
 }
