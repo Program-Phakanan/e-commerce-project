@@ -76,14 +76,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const fullAddress = [address, city, postalCode].filter(Boolean).join(', ');
+
         const customer = await prisma.customer.create({
             data: {
                 name,
                 email,
                 phone,
-                address,
-                city,
-                postalCode,
+                address: fullAddress,
             },
         });
 
