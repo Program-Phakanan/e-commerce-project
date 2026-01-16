@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, User, Lock, ArrowRight, LayoutDashboard, ShoppingBag, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, ArrowRight, LayoutDashboard, ShoppingBag, Sparkles, Loader2 } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginContent() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -230,5 +230,17 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     );
 }
