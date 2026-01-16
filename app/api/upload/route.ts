@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
     try {
@@ -18,21 +17,26 @@ export async function POST(request: NextRequest) {
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
         const filename = `${uniqueSuffix}-${file.name.replace(/\s+/g, '-')}`;
 
-        // Ensure upload directory exists
-        const uploadDir = join(process.cwd(), 'public', 'uploads');
-        try {
-            await mkdir(uploadDir, { recursive: true });
-        } catch (e) {
-            // Ignore error if directory exists
+        // Upload to Supabase Storage
+        // NOTE: You must create a public bucket named 'uploads' in your Supabase dashboard
+        const { data: uploadData, error } = await supabase.storage
+            .from('uploads')
+            .upload(filename, buffer, {
+                contentType: file.type,
+                upsert: false
+            });
+
+        if (error) {
+            console.error('Supabase upload error:', error);
+            return NextResponse.json({ success: false, message: 'Upload to storage failed', error: error.message }, { status: 500 });
         }
 
-        const path = join(uploadDir, filename);
-        await writeFile(path, buffer);
+        // Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('uploads')
+            .getPublicUrl(filename);
 
-        // URL accessible from browser
-        const fileUrl = `/uploads/${filename}`;
-
-        return NextResponse.json({ success: true, url: fileUrl });
+        return NextResponse.json({ success: true, url: publicUrl });
     } catch (error) {
         console.error('Upload error:', error);
         return NextResponse.json({ success: false, message: 'Upload failed' }, { status: 500 });
