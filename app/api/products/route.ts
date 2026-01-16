@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error('Error fetching products:', error);
         return NextResponse.json(
-            { message: 'Internal server error' },
+            { message: 'Internal server error', error: error instanceof Error ? error.message : String(error) },
             { status: 500 }
         );
     }
@@ -193,9 +193,9 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(product, { status: 201 });
     } catch (error) {
-        console.error('Error creating product:', error);
+        console.error('Login error:', error);
         return NextResponse.json(
-            { message: 'Internal server error', error: String(error) },
+            { message: 'Internal server error', error: error instanceof Error ? error.message : String(error) },
             { status: 500 }
         );
     }
