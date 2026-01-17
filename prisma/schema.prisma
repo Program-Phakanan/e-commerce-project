@@ -169,7 +169,23 @@ model Coupon {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  usages         CouponUsage[]
+
   @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  couponId  String   @map("coupon_id")
+  ipAddress String   @map("ip_address")
+  orderId   String?  @map("order_id")
+  userId    String?  @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  coupon    Coupon   @relation(fields: [couponId], references: [id])
+
+  @@unique([couponId, ipAddress])
+  @@map("coupon_usages")
 }
 
 // Orders Table

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, User, MapPin, Plus, Trash2, Camera, Loader2, Save, Mail, Phone, Calendar, ShieldCheck, Star } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Plus, Trash2, Camera, Loader2, Save, Mail, Phone, Package, ChevronRight, Star } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 interface Address {
@@ -40,7 +40,9 @@ export default function ProfilePage() {
         lastName: '',
         phone: '',
         addressLine: '',
-        city: '',
+        subdistrict: '',
+        district: '',
+        province: '',
         zipCode: '',
         isDefault: false
     });
@@ -162,13 +164,22 @@ export default function ProfilePage() {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
+
+            // Construct City string from separate fields
+            const fullCity = `ต.${newAddress.subdistrict} อ.${newAddress.district} จ.${newAddress.province}`;
+
+            const payload = {
+                ...newAddress,
+                city: fullCity
+            };
+
             const res = await fetch('/api/user/addresses', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                 },
-                body: JSON.stringify(newAddress)
+                body: JSON.stringify(payload)
             });
 
             if (res.ok) {
@@ -176,7 +187,7 @@ export default function ProfilePage() {
                 setShowAddressForm(false);
                 setNewAddress({
                     label: 'Home', firstName: '', lastName: '', phone: '',
-                    addressLine: '', city: '', zipCode: '', isDefault: false
+                    addressLine: '', subdistrict: '', district: '', province: '', zipCode: '', isDefault: false
                 });
                 Swal.fire({ icon: 'success', title: 'เพิ่มที่อยู่สำเร็จ', timer: 1500, showConfirmButton: false });
             } else {
@@ -242,7 +253,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 relative pb-20 font-sans selection:bg-cyan-100">
+        <div className="min-h-screen bg-slate-50 relative pb-24 md:pb-20 font-sans selection:bg-cyan-100">
             {/* Ambient Background */}
             <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-gradient-to-br from-cyan-100/40 to-blue-100/40 rounded-full blur-3xl" />
@@ -338,6 +349,32 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
+                {/* Menu Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* My Orders Card */}
+                    <div
+                        onClick={() => router.push('/my-orders')}
+                        className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl shadow-cyan-900/5 border border-white p-6 cursor-pointer hover:shadow-cyan-500/10 hover:-translate-y-1 transition-all group"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <Package className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-gray-800 text-lg group-hover:text-blue-600 transition-colors">ประวัติการสั่งซื้อ</h3>
+                                <p className="text-gray-500 text-sm">ดูรายการสั่งซื้อและสถานะพัสดุ</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center text-sm font-bold text-gray-400 group-hover:text-blue-600 transition-colors">
+                            <span>ดูทั้งหมด</span>
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                        </div>
+                    </div>
+
+                    {/* Placeholder for future features or another menu */}
+                    {/* For layout balance, or left empty in grid */}
+                </div>
+
                 {/* Addresses Section */}
                 <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl shadow-cyan-900/5 border border-white p-8">
                     <div className="flex items-center justify-between mb-8">
@@ -388,17 +425,26 @@ export default function ProfilePage() {
                                         <label className="input-label">เบอร์โทรศัพท์</label>
                                         <input placeholder="08x-xxx-xxxx" className="modern-input" value={newAddress.phone} onChange={e => setNewAddress({ ...newAddress, phone: e.target.value })} required />
                                     </div>
+                                    <div className="md:col-span-2">
+                                        <label className="input-label">ที่อยู่ (บ้านเลขที่, ถนน, ซอย, หมู่ที่)</label>
+                                        <textarea placeholder="บ้านเลขที่, หมู่บ้าน, ถนน, ซอย..." className="modern-input min-h-[80px]" value={newAddress.addressLine} onChange={e => setNewAddress({ ...newAddress, addressLine: e.target.value })} required />
+                                    </div>
+
+                                    <div>
+                                        <label className="input-label">ตำบล / แขวง</label>
+                                        <input placeholder="ระบุตำบล..." className="modern-input" value={newAddress.subdistrict} onChange={e => setNewAddress({ ...newAddress, subdistrict: e.target.value })} required />
+                                    </div>
+                                    <div>
+                                        <label className="input-label">อำเภอ / เขต</label>
+                                        <input placeholder="ระบุอำเภอ..." className="modern-input" value={newAddress.district} onChange={e => setNewAddress({ ...newAddress, district: e.target.value })} required />
+                                    </div>
+                                    <div>
+                                        <label className="input-label">จังหวัด</label>
+                                        <input placeholder="ระบุจังหวัด..." className="modern-input" value={newAddress.province} onChange={e => setNewAddress({ ...newAddress, province: e.target.value })} required />
+                                    </div>
                                     <div>
                                         <label className="input-label">รหัสไปรษณีย์</label>
                                         <input placeholder="xxxxx" className="modern-input" value={newAddress.zipCode} onChange={e => setNewAddress({ ...newAddress, zipCode: e.target.value })} required />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="input-label">ที่อยู่</label>
-                                        <textarea placeholder="บ้านเลขที่, ถนน, ซอย, รายละเอียดอื่นๆ..." className="modern-input min-h-[80px]" value={newAddress.addressLine} onChange={e => setNewAddress({ ...newAddress, addressLine: e.target.value })} required />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="input-label">จังหวัด / อำเภอ / ตำบล</label>
-                                        <input placeholder="กรอกข้อมูลจังหวัด..." className="modern-input" value={newAddress.city} onChange={e => setNewAddress({ ...newAddress, city: e.target.value })} required />
                                     </div>
 
                                     <div className="md:col-span-2 pt-2">

@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   description: "ระบบจัดการร้านค้าออนไลน์ครบวงจร - จัดการสินค้า คำสั่งซื้อ ลูกค้า และคลังสินค้า",
 };
 
+import MobileNav from "@/components/MobileNav";
+
+// ... existing imports ...
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -22,6 +26,7 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>
             {children}
+            <MobileNav />
           </CartProvider>
         </AuthProvider>
       </body>

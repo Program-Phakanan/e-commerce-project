@@ -10,6 +10,12 @@
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Custom Utilities */
 @layer utilities {
   .text-shadow {

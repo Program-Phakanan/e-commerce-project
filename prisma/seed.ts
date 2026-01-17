@@ -26,7 +26,37 @@ async function main() {
     });
   }
 
-  // Create Admin User
+  // Create Payment Methods
+  console.log('💳 Creating payment methods...');
+  const paymentMethods = [
+    {
+      name: 'Credit/Debit Card',
+      type: 'CARD', // Must match PaymentMethodType enum if applicable, or string
+      details: 'Pay securely with Stripe',
+      isActive: true,
+      // provider removed
+    },
+    {
+      name: 'PromptPay',
+      type: 'PROMPTPAY',
+      details: 'Scan QR Code to pay',
+      isActive: true,
+      // provider removed
+    }
+  ];
+
+  for (const method of paymentMethods) {
+    // Check if exists by name to avoid duplicates if specific constraints aren't there
+    const existing = await prisma.paymentMethod.findFirst({
+      where: { name: method.name }
+    });
+
+    if (!existing) {
+      await prisma.paymentMethod.create({
+        data: method
+      });
+    }
+  }
   console.log('👤 Creating admin user...');
   const hashedPassword = await bcrypt.hash('admin123', 10);
   await prisma.user.upsert({
@@ -81,6 +111,23 @@ async function main() {
       create: cat,
     });
     categoryMap[cat.name] = created.id;
+  }
+
+  // --- Create Coupons ---
+  console.log('🎟️ Creating coupons...');
+  const coupons = [
+    { code: 'SAVE50', discountType: 'FIXED', discountValue: 50, isActive: true },
+    { code: 'SAVE100', discountType: 'FIXED', discountValue: 100, isActive: true },
+    { code: 'PROMO10', discountType: 'PERCENT', discountValue: 10, isActive: true },
+    { code: 'WELCOME', discountType: 'FIXED', discountValue: 99, isActive: true, minOrderAmount: 0 },
+  ];
+
+  for (const coupon of coupons) {
+    await prisma.coupon.upsert({
+      where: { code: coupon.code },
+      update: coupon,
+      create: coupon,
+    });
   }
 
   // --- Create 20 Sea Products ---

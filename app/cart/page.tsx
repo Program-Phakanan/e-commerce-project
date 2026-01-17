@@ -81,7 +81,7 @@ export default function CartPage() {
                                     <div className="flex-1">
                                         <h3 className="font-bold text-gray-900 mb-1">{item.name}</h3>
                                         <p className="text-blue-600 font-bold text-lg">
-                                            ฿{item.price.toLocaleString()}
+                                            ฿{(item.price || 0).toLocaleString()}
                                         </p>
                                     </div>
 
@@ -106,7 +106,7 @@ export default function CartPage() {
                                     <div className="text-right">
                                         <p className="text-sm text-gray-600 mb-1">รวม</p>
                                         <p className="text-xl font-bold text-gray-900">
-                                            ฿{(item.price * item.quantity).toLocaleString()}
+                                            ฿{((item.price || 0) * item.quantity).toLocaleString()}
                                         </p>
                                     </div>
 

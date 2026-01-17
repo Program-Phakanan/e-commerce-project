@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
         const search = searchParams.get('search') || '';
         const statusId = searchParams.get('statusId');
         const paymentStatus = searchParams.get('paymentStatus');
+        const customerId = searchParams.get('customerId');
 
         const skip = (page - 1) * limit;
 
@@ -24,7 +25,9 @@ export async function GET(request: NextRequest) {
         }
 
         if (statusId) where.statusId = statusId;
+        if (statusId) where.statusId = statusId;
         if (paymentStatus) where.paymentStatus = paymentStatus;
+        if (customerId) where.customerId = customerId;
 
         // Fetch orders with specific selection
         const [orders, total] = await Promise.all([
@@ -230,7 +233,36 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        // 9. Legacy Compatibility Map
+        // 9. Handle Coupon Usage (Record IP & Increment Count)
+        if (couponCode) {
+            const coupon = await prisma.coupon.findUnique({
+                where: { code: couponCode.toUpperCase() }
+            });
+
+            if (coupon) {
+                // Get Client IP
+                const forwardedFor = request.headers.get('x-forwarded-for');
+                const ip = forwardedFor ? forwardedFor.split(',')[0] : '127.0.0.1';
+
+                // Create Usage Record
+                await prisma.couponUsage.create({
+                    data: {
+                        couponId: coupon.id,
+                        ipAddress: ip,
+                        orderId: order.id,
+                        userId: customerIdToUse
+                    }
+                });
+
+                // Increment Usage Count
+                await prisma.coupon.update({
+                    where: { id: coupon.id },
+                    data: { usedCount: { increment: 1 } }
+                });
+            }
+        }
+
+        // 10. Legacy Compatibility Map
         // The frontend expects 'orderItems' but the DB relation is 'items'.
         const responseOrder = {
             ...order,

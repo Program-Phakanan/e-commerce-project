@@ -28,6 +28,7 @@ export async function GET(
                                 name: true,
                                 sku: true,
                                 images: true,
+                                price: true, // Needed for cart
                             },
                         },
                     },

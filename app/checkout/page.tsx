@@ -30,7 +30,9 @@ export default function CheckoutPage() {
         email: user?.email || '',
         phone: '',
         address: '',
-        city: '',
+        subdistrict: '',
+        district: '',
+        province: '',
         zipCode: '',
         paymentMethod: '' // Will be set to first available method ID
     });
@@ -80,13 +82,29 @@ export default function CheckoutPage() {
     };
 
     const fillAddress = (addr: any) => {
+        let subdistrict = '';
+        let district = '';
+        let province = addr.city || '';
+
+        // Try to parse "ต.subdistrict อ.district จ.province"
+        // This regex handles the standardized format we save in Profile/Checkout
+        const match = addr.city ? addr.city.match(/ต\.(.*?)\s+อ\.(.*?)\s+จ\.(.*)/) : null;
+
+        if (match) {
+            subdistrict = match[1].trim();
+            district = match[2].trim();
+            province = match[3].trim();
+        }
+
         setFormData(prev => ({
             ...prev,
             firstName: addr.firstName,
             lastName: addr.lastName,
             phone: addr.phone,
             address: addr.addressLine,
-            city: addr.city,
+            subdistrict,
+            district,
+            province,
             zipCode: addr.zipCode
         }));
     };
@@ -144,14 +162,21 @@ export default function CheckoutPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!user) {
-            Swal.fire('Error', 'กรุณาเข้าสู่ระบบก่อน', 'error');
-            router.push('/login?redirect=/checkout');
-            return;
-        }
+        // ... (existing auth checks)
 
         if (!formData.paymentMethod) {
             Swal.fire('Error', 'กรุณาเลือกวิธีการชำระเงิน', 'error');
+            return;
+        }
+
+        // Validate all new fields
+        if (!formData.firstName || !formData.lastName || !formData.phone || !formData.address ||
+            !formData.subdistrict || !formData.district || !formData.province || !formData.zipCode) {
+            Swal.fire({
+                icon: 'error',
+                title: 'ข้อมูลจัดส่งไม่ครบถ้วน',
+                text: 'กรุณากรอกข้อมูลที่อยู่ให้ครบทุกช่อง (ตำบล, อำเภอ, จังหวัด)',
+            });
             return;
         }
 
@@ -160,9 +185,15 @@ export default function CheckoutPage() {
         try {
             const selectedPayment = paymentMethods.find(p => p.id === formData.paymentMethod);
 
+            // Format Full Address string for DB
+            const fullAddress = `${formData.firstName} ${formData.lastName}
+${formData.address}
+ต.${formData.subdistrict} อ.${formData.district} จ.${formData.province} ${formData.zipCode}
+Tel: ${formData.phone}`;
+
             const orderData = {
                 customerId: user.id,
-                shippingAddress: `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city} ${formData.zipCode}\nTel: ${formData.phone}`,
+                shippingAddress: fullAddress,
                 paymentMethod: selectedPayment?.name || 'Unknown',
                 paymentStatus: 'Pending',
                 notes: appliedCoupon ? `Used Coupon: ${appliedCoupon.code}` : '',
@@ -297,16 +328,23 @@ export default function CheckoutPage() {
                                 </div>
                                 <h2 className="text-xl font-bold text-gray-900">ที่อยู่จัดส่ง</h2>
                                 {savedAddresses.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const defaultAddr = savedAddresses.find((a: any) => a.isDefault) || savedAddresses[0];
-                                            if (defaultAddr) fillAddress(defaultAddr);
-                                        }}
-                                        className="ml-auto text-sm text-blue-600 hover:text-blue-800"
-                                    >
-                                        ใช้ที่อยู่ saved
-                                    </button>
+                                    <div className="ml-auto">
+                                        <select
+                                            value=""
+                                            onChange={(e) => {
+                                                const addr = savedAddresses.find((a: any) => a.id === e.target.value);
+                                                if (addr) fillAddress(addr);
+                                            }}
+                                            className="bg-blue-50 text-blue-700 text-sm font-bold px-4 py-2 rounded-lg border border-transparent hover:bg-blue-100 focus:ring-2 focus:ring-blue-200 outline-none cursor-pointer transition-all"
+                                        >
+                                            <option value="" disabled>เลือกที่อยู่จากรายการ...</option>
+                                            {savedAddresses.map((addr: any) => (
+                                                <option key={addr.id} value={addr.id}>
+                                                    {addr.label} {addr.isDefault ? '(ค่าเริ่มต้น)' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 )}
                             </div>
 
@@ -324,12 +362,20 @@ export default function CheckoutPage() {
                                     <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">ที่อยู่</label>
-                                    <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" required placeholder="บ้านเลขที่, ถนน, ซอย..." />
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">ที่อยู่ (บ้านเลขที่, หมู่, ซอย, ถนน)</label>
+                                    <textarea name="address" value={formData.address} onChange={handleInputChange} rows={2} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" required placeholder="บ้านเลขที่, หมู่บ้าน, ถนน..." />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">จังหวัด/เขต</label>
-                                    <input type="text" name="city" value={formData.city} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">แขวง / ตำบล</label>
+                                    <input type="text" name="subdistrict" value={(formData as any).subdistrict || ''} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">เขต / อำเภอ</label>
+                                    <input type="text" name="district" value={(formData as any).district || ''} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">จังหวัด</label>
+                                    <input type="text" name="province" value={(formData as any).province || ''} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">รหัสไปรษณีย์</label>
@@ -348,22 +394,54 @@ export default function CheckoutPage() {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {paymentMethods.map(method => (
-                                    <label key={method.id} className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all ${formData.paymentMethod === method.id ? 'border-blue-500 ring-2 ring-blue-50 bg-blue-50/30' : 'border-gray-200 hover:border-blue-300'}`}>
-                                        <input
-                                            type="radio"
-                                            name="paymentMethod"
-                                            value={method.id}
-                                            checked={formData.paymentMethod === method.id}
-                                            onChange={handleInputChange}
-                                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">{method.name}</span>
-                                            <span className="block text-xs text-gray-500">{method.details || method.type}</span>
-                                        </div>
-                                    </label>
-                                ))}
+                                {paymentMethods.map(method => {
+                                    const isSelected = formData.paymentMethod === method.id;
+                                    const isPromptPay = method.name.toLowerCase().includes('promptpay') || method.type === 'PROMPTPAY';
+                                    const isCard = method.type === 'CARD';
+
+                                    return (
+                                        <label
+                                            key={method.id}
+                                            className={`relative flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-200 ${isSelected
+                                                ? 'border-blue-600 ring-4 ring-blue-50 bg-blue-50/10 shadow-md'
+                                                : 'border-gray-200 hover:border-blue-300 hover:shadow-sm bg-white'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="radio"
+                                                        name="paymentMethod"
+                                                        value={method.id}
+                                                        checked={isSelected}
+                                                        onChange={handleInputChange}
+                                                        className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                    />
+                                                    <span className={`font-bold ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>
+                                                        {isPromptPay ? 'PromptPay' : method.name}
+                                                    </span>
+                                                </div>
+                                                {isPromptPay && (
+                                                    <img
+                                                        src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/PromptPay_logo.png/800px-PromptPay_logo.png"
+                                                        alt="PromptPay"
+                                                        className="h-6 object-contain"
+                                                    />
+                                                )}
+                                                {isCard && (
+                                                    <div className="flex -space-x-2">
+                                                        <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4 w-auto bg-white border rounded px-1" />
+                                                        <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4 w-auto bg-white border rounded px-1" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <p className="text-xs text-gray-500 pl-8 leading-relaxed">
+                                                {method.details || method.type}
+                                            </p>
+                                        </label>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>

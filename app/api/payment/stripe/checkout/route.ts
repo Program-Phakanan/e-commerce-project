@@ -12,22 +12,32 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: 'No items in checkout' }, { status: 400 });
         }
 
-        const line_items = items.map((item: any) => ({
-            price_data: {
-                currency: 'thb',
-                product_data: {
-                    name: item.name,
-                    images: item.image ? [item.image] : [],
+        const line_items = items.map((item: any) => {
+            // Stripe requires absolute URLs and they must be publicly accessible.
+            // Localhost URLs or relative paths will cause issues or won't render.
+            // safely handle images
+            let images: string[] = [];
+            if (item.image && item.image.startsWith('http') && !item.image.includes('localhost') && !item.image.includes('127.0.0.1')) {
+                images = [item.image];
+            }
+
+            return {
+                price_data: {
+                    currency: 'thb',
+                    product_data: {
+                        name: item.name,
+                        images: images,
+                    },
+                    unit_amount: Math.round(item.price * 100),
                 },
-                unit_amount: Math.round(item.price * 100), // Stripe expects amount in cents/satang
-            },
-            quantity: item.quantity,
-        }));
+                quantity: item.quantity,
+            };
+        });
 
         const origin = request.headers.get('origin') || process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card', 'promptpay'],
+            payment_method_types: ['card'], // Removing 'promptpay' temporarily to isolate card issues, or keep if account supports it. Safest is just card for "Credit Card" option.
             line_items,
             mode: 'payment',
             success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
@@ -40,10 +50,10 @@ export async function POST(request: NextRequest) {
         });
 
         return NextResponse.json({ url: session.url, sessionId: session.id });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Stripe Checkout Error:', error);
         return NextResponse.json(
-            { message: 'Internal Server Error', error: String(error) },
+            { message: 'Internal Server Error', error: error.message || String(error) },
             { status: 500 }
         );
     }

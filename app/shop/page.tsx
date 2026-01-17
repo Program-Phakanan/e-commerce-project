@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShoppingCart, Search, ShoppingBag, Plus, X, Filter, Sparkles, TrendingUp, User, LogOut, LayoutDashboard, LogIn, ChevronRight, Star, Flame, Tag } from 'lucide-react';
+import { ShoppingCart, Search, ShoppingBag, Plus, X, Filter, Sparkles, TrendingUp, User, LogOut, LayoutDashboard, LogIn, ChevronRight, Star, Flame, Tag, Package } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 interface Category {
@@ -142,7 +142,7 @@ export default function ShopPage() {
     ).slice(0, 5);
 
     return (
-        <div className="min-h-screen bg-slate-50 relative font-sans pb-20">
+        <div className="min-h-screen bg-slate-50 relative font-sans pb-24 md:pb-20">
             {/* 🌊 Background */}
             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-sky-50 via-white to-white" />
@@ -228,6 +228,16 @@ export default function ShopPage() {
                                 <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
 
                                 <div className="flex items-center gap-2">
+                                    {user && (
+                                        <button
+                                            onClick={() => router.push('/my-orders')}
+                                            className="p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:shadow-lg hover:-translate-y-0.5 transition-all group"
+                                            title="ประวัติการสั่งซื้อ"
+                                        >
+                                            <Package className="w-6 h-6 text-gray-600 group-hover:text-blue-600 transition-colors" />
+                                        </button>
+                                    )}
+
                                     <button onClick={() => router.push('/cart')} className="relative p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:shadow-lg hover:-translate-y-0.5 transition-all group">
                                         <ShoppingCart className="w-6 h-6 text-gray-600 group-hover:text-blue-600 transition-colors" />
                                         {totalItems > 0 && (

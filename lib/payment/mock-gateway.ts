@@ -1,12 +1,14 @@
 import { prisma } from '@/lib/prisma';
+// Ensure compatibility with CommonJS library
+const generatePayload = require('promptpay-qr');
 
-// This is a Mock Gateway Simulation
-// In real life, this would be GB Prime Pay or Omise SDK
+// --- CONFIGURATION ---
+const PROMPTPAY_NUMBER = process.env.PROMPTPAY_NUMBER || '0972766446'; // Default fallback or use config
 
-export const MockGateway = {
+export const PromptPayGateway = {
     // 1. Create a "Transaction" and get QR Code
     createTransaction: async (orderId: string, amount: number) => {
-        // Generate a fake Reference ID
+        // Generate a Reference ID
         const refId = `REF-${Math.floor(Math.random() * 1000000)}`;
 
         // Update Order with this initial Ref
@@ -15,11 +17,27 @@ export const MockGateway = {
             data: { paymentRef: refId }
         });
 
-        // Use a free API to generate a QR Code image (text based)
-        // In real PromptPay, this payload string is complex.
-        // Here we just encode the refId to make it look real.
-        const mockPayload = `PROMPTPAY|${refId}|${amount}`;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(mockPayload)}`;
+        // --- REAL PROMPTPAY GENERATION ---
+        const amountNum = Number(amount);
+        let payload = '';
+
+        try {
+            // Function might be the module itself or .default
+            const generator = typeof generatePayload === 'function' ? generatePayload : generatePayload.default;
+            if (typeof generator === 'function') {
+                payload = generator(PROMPTPAY_NUMBER, { amount: amountNum });
+            } else {
+                console.error('PromptPay Library Error: generatePayload is not a function', generatePayload);
+                payload = 'ERROR_LIB_NOT_FOUND';
+            }
+        } catch (error) {
+            console.error('Generate Payload Error:', error);
+            payload = 'ERROR_GENERATION_FAILED';
+        }
+
+        // Use a public API to convert payload to Image URL
+        // In FULL production, you might generate QR locally to avoid external dependency, but this is fine for now.
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}`;
 
         return {
             refId,
@@ -29,9 +47,10 @@ export const MockGateway = {
         };
     },
 
-    // 2. Check Status (Simulation)
-    // In real life, we don't poll database often, we wait for Webhook.
-    // But for frontend polling, we check the DB status.
+    // 2. Check Status
+    // In real life, we don't polling database often, we wait for Webhook.
+    // However, for systems without Webhooks (like simple personal PromptPay), admin must manually approve,
+    // or we use a third party service. This check allows the frontend to know when the status changes.
     checkStatus: async (orderId: string) => {
         const order = await prisma.order.findUnique({
             where: { id: orderId },
@@ -40,27 +59,5 @@ export const MockGateway = {
         return order?.paymentStatus === 'Paid';
     },
 
-    // 3. Simulate Scanned & Paid (Admin Only Action)
-    simulatePaymentSuccess: async (orderId: string) => {
-        // 1. Update Order Status
-        const paidStatus = await prisma.orderStatus.findUnique({ where: { name: 'Paid' } });
-        // Fallback if 'Paid' status doesn't exist (it should from seed)
-        // If not found, we just update paymentStatus string.
-
-        const updateData: any = {
-            paymentStatus: 'Paid',
-            // Also update the Order Status flow if possible
-        };
-
-        if (paidStatus) {
-            updateData.statusId = paidStatus.id;
-        }
-
-        await prisma.order.update({
-            where: { id: orderId },
-            data: updateData
-        });
-
-        return true;
-    }
+    // confirmPayment logic could be here if we had a webhook, but we'll stick to admin manual update for now.
 };

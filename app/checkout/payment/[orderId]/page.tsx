@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useCart } from '@/contexts/CartContext';
 import Swal from 'sweetalert2';
 import { CheckCircle2, Clock, ShieldCheck, Smartphone, AlertTriangle } from 'lucide-react';
 
@@ -12,6 +13,7 @@ interface PaymentPageProps {
 export default function PaymentPage({ params }: PaymentPageProps) {
     const [orderId, setOrderId] = useState<string | null>(null);
     const router = useRouter();
+    const { addToCart } = useCart();
     const [loading, setLoading] = useState(true);
     const [qrData, setQrData] = useState<any>(null);
     const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
@@ -88,6 +90,66 @@ export default function PaymentPage({ params }: PaymentPageProps) {
         });
     };
 
+    const handleCancelPayment = async () => {
+        if (!orderId) return;
+
+        const result = await Swal.fire({
+            title: 'ยกเลิกรายการนี้?',
+            text: 'สินค้าจะถูกนำกลับเข้าตะกร้าสินค้าของคุณ',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'ยกเลิกรายการ',
+            cancelButtonText: 'กลับไปชำระเงิน',
+            confirmButtonColor: '#d33'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                // 1. Fetch Order Details to get items
+                // We use the public GET order API
+                const orderRes = await fetch(`/api/orders/${orderId}`);
+                if (!orderRes.ok) throw new Error('Failed to fetch order details');
+                const orderData = await orderRes.json();
+
+                // 2. Add items back to cart
+                if (orderData.items && Array.isArray(orderData.items)) {
+                    // Reverse loop or just add
+                    orderData.items.forEach((item: any) => {
+                        // We need product details (name, price, image) which should be in the order item or product relation
+                        // The order details API usually includes product info.
+                        // Assuming item structure has product: { name, images, price }
+                        if (item.product) {
+                            addToCart({
+                                id: item.productId,
+                                name: item.product.name,
+                                price: Number(item.price || item.product?.price),
+                                image: item.product.images ? JSON.parse(item.product.images)[0] : '', // Handle image array
+                            }, item.quantity);
+                        }
+                    });
+                }
+
+                // 3. Mark order as Cancelled (Soft Delete)
+                await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+
+                // 4. Redirect to Cart
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ยกเลิกรายการแล้ว',
+                    text: 'สินค้าถูกนำกลับเข้าตะกร้าเรียบร้อย',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    router.push('/shop'); // Or /cart if we have one, assuming shop acts as main
+                });
+
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Error', 'เกิดข้อผิดพลาดในการยกเลิก', 'error');
+            }
+        }
+    };
+
     // Debug Button
     const simulatePay = async () => {
         if (!orderId) return;
@@ -121,23 +183,30 @@ export default function PaymentPage({ params }: PaymentPageProps) {
             <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden relative">
 
                 {/* Header */}
-                <div className="bg-blue-600 p-6 text-center text-white relative overflow-hidden">
+                <div className="bg-[#003D69] p-6 text-center text-white relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10"></div>
                     <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-10 -mb-10"></div>
 
-                    <h2 className="text-2xl font-bold relative z-10">ชำระเงินผ่าน QR Code</h2>
-                    <p className="text-blue-100 text-sm mt-1 relative z-10">PromptPay / Mobile Banking</p>
+                    <div className="relative z-10 flex flex-col items-center">
+                        <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/PromptPay_logo.png/800px-PromptPay_logo.png"
+                            alt="PromptPay"
+                            className="h-10 mb-3 brightness-0 invert drop-shadow-sm"
+                        />
+                        <h2 className="text-xl font-bold">สแกนจ่ายด้วย QR Code</h2>
+                        <p className="text-blue-100 text-sm mt-1">โมบายแบงค์กิ้ง (ทุกธนาคาร)</p>
+                    </div>
                 </div>
 
                 <div className="p-8 text-center">
                     {/* Timer Alert */}
-                    <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-sm font-semibold animate-pulse">
+                    <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-sm font-semibold animate-pulse border border-orange-100">
                         <Clock className="w-4 h-4" />
-                        เหลือเวลาชำระเงิน {formatTime(timeLeft)} นาที
+                        เหลือเวลาอีก {formatTime(timeLeft)} นาที
                     </div>
 
                     {/* QR Code Section */}
-                    <div className="relative inline-block p-4 bg-white border-2 border-blue-100 rounded-2xl shadow-inner mb-6 group">
+                    <div className="relative inline-block p-4 bg-white border-2 border-[#003D69]/20 rounded-2xl shadow-inner mb-6 group">
                         {qrData?.qrUrl ? (
                             <img
                                 src={qrData.qrUrl}
@@ -146,12 +215,19 @@ export default function PaymentPage({ params }: PaymentPageProps) {
                             />
                         ) : (
                             <div className="w-64 h-64 bg-gray-100 flex items-center justify-center rounded-xl text-gray-400">
-                                QR Error
+                                <div className="text-center">
+                                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                                    <span className="text-sm">กำลังโหลด QR...</span>
+                                </div>
                             </div>
                         )}
                         {/* Logo Overlay */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-2 rounded-lg shadow-md">
-                            <Smartphone className="w-8 h-8 text-blue-600" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-2 rounded-lg shadow-lg border border-gray-100">
+                            <img
+                                src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/PromptPay_logo.png/800px-PromptPay_logo.png"
+                                alt="PromptPay"
+                                className="w-10 h-auto"
+                            />
                         </div>
                     </div>
 
@@ -162,24 +238,22 @@ export default function PaymentPage({ params }: PaymentPageProps) {
                         </p>
                     </div>
 
-                    <div className="flex items-center justify-center gap-2 text-xs text-gray-400 bg-gray-50 p-3 rounded-lg">
+
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-400 bg-gray-50 p-3 rounded-lg mb-6">
                         <ShieldCheck className="w-4 h-4 text-green-500" />
                         ระบบตรวจสอบยอดโอนอัตโนมัติ 24 ชม.
                     </div>
 
-                    {/* Simulation Section (Demo Only) */}
-                    <div className="mt-8 pt-6 border-t border-dashed border-gray-200">
-                        <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-semibold">Developers Mode &nbsp;(Demo)</p>
-                        <button
-                            onClick={simulatePay}
-                            className="w-full py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 font-mono text-sm"
-                        >
-                            <CheckCircle2 className="w-4 h-4 text-green-400" />
-                            [Demo] กดเพื่อจำลองการโอนสำเร็จ
-                        </button>
-                        <p className="text-[10px] text-gray-400 mt-2 text-center">
-                            *ในระบบจริง ปุ่มนี้จะไม่มี ลูกค้าต้องสแกนจ่ายผ่านแอปธนาคาร
-                        </p>
+                    {/* Fallback & Cancel Actions */}
+                    <div className="border-t border-gray-100 pt-6 space-y-4">
+                        <div className="mt-4">
+                            <button
+                                onClick={handleCancelPayment}
+                                className="w-full py-2.5 px-4 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                            >
+                                ยกเลิกและแก้ไขรายการ
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { MockGateway } from '@/lib/payment/mock-gateway';
+import { PromptPayGateway } from '@/lib/payment/mock-gateway';
 
 export async function POST(request: NextRequest) {
     try {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate Mock QR
-        const result = await MockGateway.createTransaction(orderId, Number(order.totalAmount));
+        const result = await PromptPayGateway.createTransaction(orderId, Number(order.totalAmount));
 
         return NextResponse.json(result);
     } catch (error) {

@@ -27,28 +27,35 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if user already exists (username OR email)
+        // Check if user already exists (username OR email) - API side check with Case Insensitive
+        // Note: Ideally enforce unique constraints in DB as well
         const existingUser = await prisma.user.findFirst({
             where: {
                 OR: [
-                    { username: username },
-                    { email: email },
+                    { username: { equals: username, mode: 'insensitive' } },
+                    { email: { equals: email, mode: 'insensitive' } },
                 ],
             },
         });
 
         if (existingUser) {
-            if (existingUser.username === username) {
+            if (existingUser.username.toLowerCase() === username.toLowerCase()) {
                 return NextResponse.json(
                     { message: 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว' },
                     { status: 400 }
                 );
             }
-            if (existingUser.email === email) {
+            if (existingUser.email.toLowerCase() === email.toLowerCase()) {
                 return NextResponse.json(
                     { message: 'อีเมลนี้ถูกใช้งานแล้ว' },
                     { status: 400 }
                 );
             }
+            // Fallback general error if collision detected but not specifically identified by strict logic above
+            return NextResponse.json(
+                { message: 'ชื่อผู้ใช้หรืออีเมลนี้ถูกใช้งานแล้ว' },
+                { status: 400 }
+            );
         }
 
         // Hash password
